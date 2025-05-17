@@ -1,0 +1,41 @@
+@startuml
+skinparam packageStyle rectangle
+
+package "Clients" {
+  [Web Browser] as A
+  [Mobile App] as B
+}
+
+package "Edge" {
+  [CDN (static assets)] as C
+  [WAF / API Gateway] as D
+}
+
+package "Compute" {
+  [Load Balancer] as E
+  [App Server Cluster\n(Spring Boot)] as F
+}
+
+package "Data Tier" {
+  [Redis Cache Cluster] as G
+  [MySQL Primary & Replicas] as H
+  [Elasticsearch Cluster] as I
+}
+
+package "Async Processing" {
+  [Message Queue\n(RabbitMQ/Kafka)] as J
+  [Background Workers\n(indexing, notifications)] as K
+}
+
+A --> C
+B --> C
+C --> D
+D --> E
+E --> F
+F --> G
+F --> H
+F --> J
+J --> K
+K --> I
+F --> I
+@enduml
