@@ -5,6 +5,7 @@ import io.github.bluething.playground.java.bloggingplatformapi.domain.CategoryDa
 import io.github.bluething.playground.java.bloggingplatformapi.domain.PostData;
 import io.github.bluething.playground.java.bloggingplatformapi.domain.PostService;
 import io.github.bluething.playground.java.bloggingplatformapi.domain.TagData;
+import io.github.bluething.playground.java.bloggingplatformapi.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentMatchers;
@@ -20,6 +21,8 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -113,5 +116,23 @@ class PostControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.title").value(updatedData.title()));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/posts/{id} - Success")
+    void testDeletePost() throws Exception {
+        doNothing().when(postService).deletePost("toDelete");
+
+        mockMvc.perform(delete(BASE_URL + "/toDelete"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("DELETE /api/v1/posts/{id} - Not Found")
+    void testDeletePostNotFound() throws Exception {
+        doThrow(new ResourceNotFoundException("Not found")).when(postService).deletePost("missing");
+
+        mockMvc.perform(delete(BASE_URL + "/missing"))
+                .andExpect(status().isNotFound());
     }
 }

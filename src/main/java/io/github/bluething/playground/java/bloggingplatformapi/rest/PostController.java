@@ -4,6 +4,7 @@ import io.github.bluething.playground.java.bloggingplatformapi.domain.PostServic
 import io.github.bluething.playground.java.bloggingplatformapi.exception.ResourceNotFoundException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -50,5 +51,11 @@ class PostController {
         var data = postService.updatePost(id, command);
         var response = PostMapper.toResponse(data);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    void deletePost(@PathVariable("id") String id) {
+        postService.deletePost(id);
     }
 }
