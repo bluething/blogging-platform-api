@@ -82,4 +82,15 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.category.id").value(data.category().id()))
                 .andExpect(jsonPath("$.tags[0].id").value("tag1"));
     }
+
+    @Test
+    @DisplayName("GET /api/v1/posts?term=search - Search")
+    void testSearchPosts() throws Exception {
+        var data = samplePostData();
+        given(postService.searchPosts("sample")).willReturn(List.of(data));
+
+        mockMvc.perform(get(BASE_URL).param("term", "sample"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("[0].title").value(data.title()));
+    }
 }

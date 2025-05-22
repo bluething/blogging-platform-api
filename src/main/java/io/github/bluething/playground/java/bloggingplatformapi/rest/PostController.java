@@ -9,6 +9,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/posts")
@@ -30,5 +31,16 @@ class PostController {
     ResponseEntity<PostResponse> getPostById(@PathVariable("id") String id) {
         var data = postService.getPostById(id).orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + id));
         return ResponseEntity.ok(PostMapper.toResponse(data));
+    }
+
+    @GetMapping
+    ResponseEntity<List<PostResponse>> getPosts(@RequestParam(value = "term", required = false) String term) {
+        var results = (term == null || term.isBlank())
+                ? postService.getAllPosts()
+                : postService.searchPosts(term);
+        var responses = results.stream()
+                .map(PostMapper::toResponse)
+                .toList();
+        return ResponseEntity.ok(responses);
     }
 }
