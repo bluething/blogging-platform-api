@@ -93,4 +93,25 @@ class PostControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("[0].title").value(data.title()));
     }
+
+    @Test
+    @DisplayName("PUT /api/v1/posts/{id} - Success")
+    void testUpdatePost() throws Exception {
+        var request = new PostRequest(
+                "Updated Title",
+                "Updated Content",
+                "cat1",
+                List.of("tag1")
+        );
+        var command = PostMapper.toUpdateCommand(request);
+        var updatedData = samplePostData();
+        given(postService.updatePost(ArgumentMatchers.eq(updatedData.id()), ArgumentMatchers.eq(command)))
+                .willReturn(updatedData);
+
+        mockMvc.perform(put(BASE_URL + "/{id}", updatedData.id())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(updatedData.title()));
+    }
 }

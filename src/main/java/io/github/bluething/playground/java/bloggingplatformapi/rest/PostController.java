@@ -43,4 +43,12 @@ class PostController {
                 .toList();
         return ResponseEntity.ok(responses);
     }
+
+    @PutMapping("/{id}")
+    ResponseEntity<PostResponse> updatePost(@PathVariable("id") String id, @Valid @RequestBody PostRequest postRequest) {
+        var command = PostMapper.toUpdateCommand(postRequest);
+        var data = postService.updatePost(id, command);
+        var response = PostMapper.toResponse(data);
+        return ResponseEntity.ok(response);
+    }
 }
