@@ -130,7 +130,7 @@ class PostControllerTest {
     @Test
     @DisplayName("DELETE /api/v1/posts/{id} - Not Found")
     void testDeletePostNotFound() throws Exception {
-        doThrow(new ResourceNotFoundException("Not found")).when(postService).deletePost("missing");
+        doThrow(new ResourceNotFoundException("Post", "missing")).when(postService).deletePost("missing");
 
         mockMvc.perform(delete(BASE_URL + "/missing"))
                 .andExpect(status().isNotFound());

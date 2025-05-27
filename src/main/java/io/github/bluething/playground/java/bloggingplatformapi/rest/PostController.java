@@ -30,7 +30,7 @@ class PostController {
 
     @GetMapping("/{id}")
     ResponseEntity<PostResponse> getPostById(@PathVariable("id") String id) {
-        var data = postService.getPostById(id).orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + id));
+        var data = postService.getPostById(id).orElseThrow(() -> new ResourceNotFoundException("Post", id));
         return ResponseEntity.ok(PostMapper.toResponse(data));
     }
 
