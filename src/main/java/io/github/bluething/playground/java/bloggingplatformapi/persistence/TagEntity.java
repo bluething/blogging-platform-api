@@ -10,7 +10,7 @@ import java.util.Set;
 @Getter
 public class TagEntity {
     @Id
-    @Column(name = "id", length = 26, nullable = false)
+    @Column(name = "id", columnDefinition = "CHAR(26)", length = 26, nullable = false)
     private String id;  // ULID
 
     @Column(name = "name", length = 50, nullable = false, unique = true)

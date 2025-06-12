@@ -11,7 +11,7 @@ import java.util.Set;
 public class CategoryEntity {
 
     @Id
-    @Column(name = "id", length = 26, nullable = false)
+    @Column(name = "id", columnDefinition = "CHAR(26)", length = 26, nullable = false)
     private String id;
 
     @Column(name = "name", length = 100, nullable = false, unique = true)

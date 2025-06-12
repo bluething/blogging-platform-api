@@ -12,7 +12,7 @@ import java.util.Set;
 public class PostEntity {
 
     @Id
-    @Column(name = "id", length = 26, nullable = false)
+    @Column(name = "id", columnDefinition = "CHAR(26)", length = 26, nullable = false)
     private String id;  // ULID
 
     @Column(name = "title", length = 255, nullable = false)
