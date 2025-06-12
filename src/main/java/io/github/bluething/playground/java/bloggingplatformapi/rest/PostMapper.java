@@ -1,12 +1,14 @@
 package io.github.bluething.playground.java.bloggingplatformapi.rest;
 
-import io.github.bluething.playground.java.bloggingplatformapi.domain.CreatePostCommand;
-import io.github.bluething.playground.java.bloggingplatformapi.domain.PostData;
-import io.github.bluething.playground.java.bloggingplatformapi.domain.UpdatePostCommand;
+import io.github.bluething.playground.java.bloggingplatformapi.domain.*;
 
 import java.util.List;
 
-public class PostMapper {
+class PostMapper {
+
+    /**
+     * Map API request to service-layer command for creating a post.
+     */
     public static CreatePostCommand toCreatePostCommand(PostRequest postRequest) {
         return new CreatePostCommand(
                 postRequest.title(),
@@ -15,6 +17,10 @@ public class PostMapper {
                 postRequest.tagIds()
         );
     }
+
+    /**
+     * Map API request to service-layer command for updating a post.
+     */
     public static UpdatePostCommand toUpdateCommand(PostRequest postRequest) {
         return new UpdatePostCommand(
                 postRequest.title(),
@@ -24,6 +30,9 @@ public class PostMapper {
         );
     }
 
+    /**
+     * Map service-layer data to API response DTO.
+     */
     public static PostResponse toResponse(PostData postData) {
         CategoryResponse category = new CategoryResponse(
                 postData.category().id(),
