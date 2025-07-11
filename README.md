@@ -27,8 +27,32 @@ You can hook into the handler to log errors in a uniform way, enrich metrics, or
 * Future extensibility  
 Need multi-language error messages, correlation IDs, or hints for remediation? You only update the handler (and ApiError), not dozens of controllers or service classes.
 
+#### About RedisCache
+##### RedisTemplate vs RedisCache
+For most CRUD‐style cache‐aside patterns—where you simply want “check cache → fallback to DB → populate cache” and “evict on write”—Spring’s Cache Abstraction (via @Cacheable/@CacheEvict) is usually the easier, more declarative choice:  
 
+| Criterion                    | RedisTemplate + Manual Service      | Spring Cache Abstraction                         |
+| ---------------------------- | ----------------------------------- | ------------------------------------------------ |
+| Control over serialization   | Full, per–operation via RedisConfig | Central, via RedisCacheConfiguration             |
+| Boilerplate in service layer | High (explicit get/put/evict calls) | Low (just annotate methods)                      |
+| Fine–grained cache behavior  | Unlimited flexibility               | Annotations cover 90% of use–cases               |
+| Metrics & monitoring         | You must instrument manually        | Built-in via Micrometer (cache hits/misses)      |
+| Migration to clustered/HA    | Manual setup                        | Still manual, but all config in RedisCacheConfig |
 
+###### When to pick RedisTemplate + Manual Service
+* You need per‐entry TTLs, per‐operation differing key structures or eviction rules.  
+* You’re doing complex operations (e.g. list/set/hashes) beyond simple key→value.  
+* You need explicit control over serialization, expiration, or pipelining within your service logic.
+
+###### When to pick Spring Cache Abstraction
+* Your use‐case is simply cache this method’s return or evict that key on update/delete.  
+* You want to minimize manual cache code and lean on Spring’s annotations.  
+* You’d like built-in cache metrics (hit/miss ratios) without extra code.
+
+###### In summary
+
+* For simple cache‐aside on your service methods, go with Spring Cache Abstraction plus the configuration `RedisCacheConfig`.  
+* If you have specialized caching logic (per‐request TTL, complex key math, reactive needs), stick with RedisTemplate and your service.
 
 #### Lombok Issues
 
