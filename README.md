@@ -54,6 +54,30 @@ For most CRUD‐style cache‐aside patterns—where you simply want “check ca
 * For simple cache‐aside on your service methods, go with Spring Cache Abstraction plus the configuration `RedisCacheConfig`.  
 * If you have specialized caching logic (per‐request TTL, complex key math, reactive needs), stick with RedisTemplate and your service.
 
+##### Why choose lettuce instead of jedis
+Spring Boot’s choice of Lettuce over Jedis as the default Redis client is driven by several key advantages:  
+1. Thread-safety & Connection Multiplexing  
+   * Lettuce uses a single, Netty-based RedisClient instance that can safely be shared across multiple threads. Internally it multiplexes requests over a small number of TCP connections.  
+   * Jedis, in contrast, requires you to manage a pool of separate connections (JedisPool) if you want to be thread-safe—otherwise you risk data corruption or exceptions when sharing a Jedis instance across threads.  
+2. Non-blocking I/O & Reactive Support  
+   * Lettuce is built on Netty and supports non-blocking I/O out of the box, making it a natural fit for both imperative and reactive (Spring WebFlux) applications.  
+   * Jedis is purely blocking/block-per-connection, so it can’t be used in a reactive pipeline without costly thread-switching wrappers.  
+3. Scalability Under High Concurrency  
+   * With connection multiplexing, Lettuce maintains high throughput and lower resource usage under heavy concurrent loads—fewer sockets open, less pooling overhead.  
+   * Jedis’s pool scales only by opening more connections, which increases memory and file-descriptor usage.  
+4. Cluster & Sentinel Features
+   * Lettuce has first-class support for Redis Cluster and Sentinel, handling topology changes, failover events, and slot migrations seamlessly.  
+   * While Jedis also supports cluster and sentinel, its blocking model means failover events can block client threads.  
+5. Simpler Configuration & Fewer Moving Parts  
+   * With Lettuce you don’t need to configure and tune a separate pool—you just set spring.redis.lettuce.pool.* if you want pooling on top, but the default “single client” model often suffices.  
+   * Jedis always requires a pool; missing or mis-configured pools can easily lead to resource exhaustion.
+
+When might you choose Jedis instead?  
+* Legacy codebases already tied to Jedis and its API.
+* Simple scripts or one-off utilities where blocking I/O is fine and dependency size matters.  
+
+But for a modern Spring Boot microservice—especially one that may grow into reactive or clustered deployments—Lettuce is the recommend choice for its performance, scalability, and feature set.
+
 #### Lombok Issues
 
 ##### Annotation Processor Error
