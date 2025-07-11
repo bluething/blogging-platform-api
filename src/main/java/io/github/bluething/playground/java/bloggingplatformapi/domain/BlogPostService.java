@@ -4,6 +4,8 @@ import com.github.f4b6a3.ulid.UlidCreator;
 import io.github.bluething.playground.java.bloggingplatformapi.exception.ResourceNotFoundException;
 import io.github.bluething.playground.java.bloggingplatformapi.persistence.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +53,7 @@ class BlogPostService implements PostService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "posts", key = "#result.id()")
     public PostData updatePost(String id, UpdatePostCommand command) {
         PostEntity existing = postRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Post", id));
@@ -80,6 +83,7 @@ class BlogPostService implements PostService {
 
     @Override
     @Transactional
+    @CacheEvict(cacheNames = "posts", key = "#id")
     public void deletePost(String id) {
         if (!postRepository.existsById(id)) {
             throw new ResourceNotFoundException("Post", id);
@@ -89,6 +93,7 @@ class BlogPostService implements PostService {
 
     @Override
     @Transactional(readOnly = true)
+    @Cacheable(cacheNames = "posts", key = "#id")
     public Optional<PostData> getPostById(String id) {
         return postRepository.findById(id)
                 .map(this::toData);

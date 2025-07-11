@@ -9,9 +9,16 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
+import org.springframework.cache.concurrent.ConcurrentMapCacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import java.time.Instant;
 import java.util.List;
@@ -21,17 +28,33 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith(SpringExtension.class)
+@SpringBootTest(classes = {
+        BlogPostService.class,
+        BlogPostServiceTest.TestCacheConfig.class
+})
 class BlogPostServiceTest {
-    @Mock
+    @TestConfiguration
+    @EnableCaching
+    static class TestCacheConfig {
+        @Bean
+        public CacheManager cacheManager() {
+            return new ConcurrentMapCacheManager("posts");
+        }
+    }
+
+    @MockitoBean
     private PostRepository postRepository;
-    @Mock
+    @MockitoBean
     private CategoryRepository categoryRepository;
-    @Mock
+    @MockitoBean
     private TagRepository tagRepository;
 
-    @InjectMocks
-    private BlogPostService postService;
+    @Autowired
+    private PostService postService;
+
+    @Autowired
+    CacheManager cacheManager;
 
     private CategoryEntity category;
     private TagEntity tag1;
@@ -42,6 +65,7 @@ class BlogPostServiceTest {
         category = new CategoryEntity(UlidCreator.getUlid().toString(), "Tech");
         tag1 = new TagEntity(UlidCreator.getUlid().toString(), "Java");
         tag2 = new TagEntity(UlidCreator.getUlid().toString(), "Spring");
+        cacheManager.getCache("posts").clear();
     }
 
     @Test
@@ -168,5 +192,26 @@ class BlogPostServiceTest {
         List<PostData> results = postService.searchPosts(term);
         assertThat(results).hasSize(1)
                 .first().extracting(PostData::content).isEqualTo("bar");
+    }
+
+    @Test
+    void whenGetPostByIdCalledTwice_thenRepositoryIsOnlyInvokedOnce() {
+        // given
+        String id = "cachedId";
+        PostEntity e = new PostEntity(
+                id, "T", "C", category, Set.of(tag1), Instant.now(), Instant.now()
+        );
+        given(postRepository.findById(id)).willReturn(Optional.of(e));
+
+        // first call: hits the mock repository
+        Optional<PostData> first = postService.getPostById(id);
+        assertThat(first).isPresent();
+
+        // second call: should be served from cache
+        Optional<PostData> second = postService.getPostById(id);
+        assertThat(second).isPresent();
+
+        // verify repo called exactly once
+        then(postRepository).should(times(1)).findById(id);
     }
 }
