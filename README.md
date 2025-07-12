@@ -175,6 +175,36 @@ This layered interaction gives you low-latency reads, high write throughput, sca
 
 ## Lesson Learned
 
+### About Timezone
+
+##### Why I choose UTC?
+* Uniform Timestamps  
+Storing and interpreting all timestamps in UTC means you don’t have to worry about daylight-saving shifts or regional offsets. You can display user-local times in your UI by converting from UTC, but your database stays a single source of truth.  
+* Environment Agnosticism  
+Your development box, CI server, staging VMs, and production hosts might each be set to different OS time zones. If you rely on the machine’s default, you risk:  
+  * Inconsistent Instant ↔ Timestamp conversions  
+  * Tests passing locally but failing on CI  
+  * Scheduled tasks or audit fields drifting unexpectedly after a deploy  
+* Simpler Troubleshooting  
+When everyone agrees “all timestamps in the system are UTC,” it’s much easier to correlate logs, trace events, and reproduce issues—no more “the server is five hours ahead” confusion.
+
+##### Why set MySQL’s time zone to UTC
+* Zero surprises on inserts and retrievals  
+When the server is in UTC, CURRENT_TIMESTAMP columns, NOW() calls, and the JDBC driver’s conversions all use UTC. No more “it was 10:00 here but stored as 15:00 in the DB” confusion.  
+* Consistent behavior in backups and replicas  
+If you ever run cross-region replicas or take backups to import elsewhere, the timestamps remain correct without needing zone offsets.  
+* Easier maintenance and debugging  
+Your ops team only has to think about one time zone when inspecting slow-query logs or binlog events.
+
+##### Bottom-Line & Best Practice
+* Driver config alone is not enough. The serverTimezone parameter only tells the client how to interpret data coming from (and going to) the server.  
+* Always align both sides:  
+  * Set MySQL’s default_time_zone = '+00:00' in my.cnf so that server‐side functions and default timestamp columns use UTC.  
+  * Keep serverTimezone=UTC in your JDBC URL so the driver matches that reality.  
+  * Optionally, leave your OS in local time for system logs—but the database itself will behave in UTC.  
+
+When both the server and the client agree on UTC, you eliminate all classes of invisible, off‐by‐zone bugs and make your timestamps rock-solid.
+
 ### Exception Handler
 I create a `GlobalExceptionHandler` class, a Spring Boot component—annotated with @ControllerAdvice—that sits “above” all your @RestController endpoints and intercepts any uncaught exceptions, turning them into structured HTTP responses.
 
@@ -252,6 +282,55 @@ When might you choose Jedis instead?
 * Simple scripts or one-off utilities where blocking I/O is fine and dependency size matters.  
 
 But for a modern Spring Boot microservice—especially one that may grow into reactive or clustered deployments—Lettuce is the recommend choice for its performance, scalability, and feature set.
+
+### About Eventual Consistency
+
+#### What happen when elasticsearch node goes down
+When you split reads between your primary store (MySQL/Redis) and your search index (Elasticsearch), you naturally get eventual consistency: writes go to MySQL first, then asynchronously to ES. If an ES node is down when you publish your indexing event, you need a strategy to guarantee that you don’t lose those updates once ES comes back up.  
+Here are the most common patterns to handle that gap:
+
+##### Durable, Acknowledged Messaging with Retries
+* Persistent messages  
+  Configure your message broker (RabbitMQ or Kafka) so that every “post.updated” or “post.created” event is written to disk before acknowledging the write. This ensures that, even if the broker or your publisher crashes, the event isn’t lost.
+* Publisher confirms / acks
+  Use publisher-confirmation (RabbitMQ) or producer acks=“all” (Kafka) so your app knows the message truly landed. Don’t remove or expire the Redis cache or mark the write fully done until you’ve got that confirmation.
+* Consumer-side retries
+  On the worker side, wrap your ES indexing logic in a retry loop with exponential backoff. If ES is down, the worker doesn’t ack the message, so the broker will redeliver once ES is back.
+* Dead-Letter / Parking Queue
+  If after N retries ES is still unreachable, route the event to a dead-letter queue so you can inspect and replay those few problematic events manually.
+
+##### Transactional Outbox Pattern
+Instead of writing directly to your broker, you:  
+1. Inside the same DB transaction that writes (or updates) the post in MySQL, also insert a row into an outbox table (post_outbox), recording the post ID and event type.  
+2. Commit that single DB transaction—this guarantees that if the post write succeeds, the outbox row is guaranteed too, and vice versa.  
+3. A separate poller or CDC (e.g. Debezium) reads new rows from the outbox table and publishes them to your broker.  
+4. Once published successfully, it marks the outbox row as dispatched (or deletes it).
+
+Why it helps: the outbox is atomic with your post write. Even if ES—and thus your broker—is completely down during the transaction, the outbox row remains waiting. Once the broker/ES come back, the poller will reliably pick it up and index the post.
+
+##### Fallback Search or Dual-Source Query
+
+If ES is down briefly, clients calling /posts?term=foo could:  
+* Return an error (503) to indicate search is unavailable, or  
+* Fall back to a simple DB query with LIKE %foo% (slow, but functional) so you still return results—knowing they’ll be fully up-to-date.  
+
+This ensures your API remains available even if search is degraded.
+
+##### Monitoring & Alerting
+* Queue depth / lag  
+Track the number of unprocessed messages or consumer lag. A growing backlog is an early warning that ES is struggling.  
+* ES health checks  
+Use Spring Actuator or an external monitoring system (Prometheus + Grafana) to alert when your ES cluster turns yellow/red or when bulk-reindex latencies rise.
+
+##### Putting it all together
+1. Write to MySQL inside a transaction.  
+2. Record an outbox row alongside that write.  
+3. Poll or CDC the outbox → publish to broker (persistent + confirmed).  
+4. Worker consumes → retry-index into ES until success → mark outbox row done.  
+5. Read /posts from Redis/MySQL; read /posts?term=… from ES or fallback to DB if ES unavailable.  
+6. Monitor broker queue depth and ES health to detect and address issues quickly.  
+
+This combination ensures that—even if Elasticsearch is down during writes—all post events will reliably flow into ES once it recovers, preserving eventual consistency for search.
 
 ### Lombok Issues
 
